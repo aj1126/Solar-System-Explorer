@@ -2,7 +2,7 @@
 
 *An Interactive Excel Workbook for Exploring the Solar System*  
 **Version 1.0 — September 17, 2025**
-
+**SubVersion v001 - Sep 18 2025**
 ---
 
 ## Overview
