@@ -1,0 +1,6 @@
+Module1 - MirrorSortingData
+Module2 - ResetSortingData
+Module3 - ColorizeSolarSystem
+Module4 - ColorizeOrbitalPlot
+Module5 - ResizeOrbitalPlot
+Module6 - '=== Unicode helper + macro ===
