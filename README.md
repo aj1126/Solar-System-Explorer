@@ -1,7 +1,7 @@
 # Solar System Explorer
 
 *An Interactive Excel Workbook for Exploring the Solar System*  
-**Version 1.0 — September 17, 2025**
+**Version 1.0 — September 17, 2025 (Forked Sep 18th 2025)**
 
 ---
 
