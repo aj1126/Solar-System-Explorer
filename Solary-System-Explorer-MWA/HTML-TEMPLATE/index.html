@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System Explorer</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <header>
+        <h1>Solar System Explorer</h1>
+        <div class="sort-controls">
+            <label for="sort-select">Sort by:</label>
+            <select id="sort-select">
+                <option value="semi_major_axis_au">Distance from Sun</option>
+                <option value="radius_km">Radius</option>
+                <option value="density_g_cm3">Density</option>
+                <option value="name">Name (A-Z)</option>
+            </select>
+            <button id="sort-direction">Descending</button>
+        </div>
+    </header>
+    <main>
+        <table id="solar-system-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th># of Satellites</th>
+                    <th>Radius (km)</th>
+                    <th>Semi-Major Axis (AU)</th>
+                    <th>Eccentricity</th>
+                    <th>Density (g/cm³)</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>
