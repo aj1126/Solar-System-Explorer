@@ -9,7 +9,7 @@ When gemini created the json object template is changed the listings for value t
 
 
 Design Details:
-
+Fix planet type
 
 
 Goals:
