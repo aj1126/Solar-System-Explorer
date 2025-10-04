@@ -61,7 +61,10 @@
       "argument_of_periapsis_deg",
       "longitude_of_ascending_node_deg",
       "mean_anomaly_deg",
-      "density_g_cm3",
+      "density_g_cm3"
+      
+    ],
+    "optional": [
       "type"
     ]
   }
