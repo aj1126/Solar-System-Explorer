@@ -1,4 +1,4 @@
-﻿*,Name ⇘,# of Satellites,Radius (r),Semi-Major Axis (a),Eccentricity (e),Inclination (i),Argument of Periapsis (ω),Longitude of Ascending Node (Ω),Mean Anomaly (M),Density (ρ),,,,,,,,,,,,SolSys_ID,Domain_ID
+﻿*,name,satellites,radius_km,semi_major_axis_au,eccentricity,inclination_deg,argument_of_periapsis_deg,longitude_of_ascending_node_deg,mean_anomaly_deg,density_g_cm3,type,,,,,,,,,,,SolSys_ID,Domain_ID
 ☿,Mercury,0,"2,440 km",0.387 AU,0.206,7.005°,29.124°,48.331°,174.796°,5.427 g/cm3,,,,,,,,,,,,2,1
 ♀,Venus,0,"6,052 km",0.723 AU,0.007,3.395°,54.884°,76.689°,50.115°,5.243 g/cm3,,,,,,,,,,,,3,2
 TRJN,2013 ND15,0,50 m,0.724 AU,0.612,4.796°,19.697°,95.841°,198.82°,?,,,,,,,,,,,,4,2
