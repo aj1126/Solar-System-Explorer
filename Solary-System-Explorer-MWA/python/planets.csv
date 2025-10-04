@@ -1,0 +1,4 @@
+name,satellites,radius_km,semi_major_axis_au,eccentricity,inclination_deg,argument_of_periapsis_deg,longitude_of_ascending_node_deg,mean_anomaly_deg,density_g_cm3,type
+Mercury,0,2440,0.387,0.206,7.005,29.124,48.331,174.796,5.427,planet
+Venus,0,6052,0.723,0.007,3.395,54.884,76.68,50.115,5.243,planet
+Earth,1,6371,1,0.017,0,114.208,348.739,357.517,5.514,planet
