@@ -41,4 +41,7 @@ def convert_csv_to_json(csv_filepath, json_filepath):
 # --- Run the conversion ---
 # Make sure 'planets.csv' is in the same directory as this script.
 # The output will be 'planets.json'.
-convert_csv_to_json('planets.csv', 'planets.json')
+# Old line at the bottom of the script
+# convert_csv_to_json('planets.csv', 'planets.json')
+# New line using a relative path
+convert_csv_to_json('../csv_folder/planets.csv', 'planets.json')
