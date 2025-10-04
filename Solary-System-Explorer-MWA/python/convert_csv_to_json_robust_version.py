@@ -41,8 +41,11 @@ CSV_FOLDER = PARENT_DIR / "csv_folder"
 JSON_OUTPUT_FOLDER = PARENT_DIR # Let's save the JSON in the parent folder
 
 # --- Construct the full paths ---
-csv_file_path = CSV_FOLDER / "planets.csv"
-json_file_path = JSON_OUTPUT_FOLDER / "planets.json"
+# csv_file_path = CSV_FOLDER / "planets.csv"
+# json_file_path = JSON_OUTPUT_FOLDER / "planets.json"
+csv_file_path = CSV_FOLDER / "SolarSystem-extracted.csv"
+json_file_path = JSON_OUTPUT_FOLDER / "SolarSystem-extracted.json"
+
 
 # --- Run the conversion with the new paths ---
 convert_csv_to_json(csv_file_path, json_file_path)
