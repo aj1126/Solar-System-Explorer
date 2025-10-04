@@ -1,0 +1,21 @@
+NOTES:
+When gemini created the json object template is changed the listings for value types (au, deg, g/cm^3)
+
+
+
+
+
+
+
+
+Design Details:
+
+
+
+Goals:
+
+
+
+Required Outcomes:
+
+

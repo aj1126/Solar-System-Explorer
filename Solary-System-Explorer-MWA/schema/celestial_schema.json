@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Celestial Body",
+  "description": "A schema for representing a celestial body in the solar system.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "The common name of the celestial body."
+      },
+      "satellites": {
+        "type": "integer",
+        "description": "The number of natural satellites (moons)."
+      },
+      "radius_km": {
+        "type": "number",
+        "description": "The equatorial radius in kilometers."
+      },
+      "semi_major_axis_au": {
+        "type": "number",
+        "description": "The semi-major axis of the orbit in astronomical units (AU)."
+      },
+      "eccentricity": {
+        "type": "number",
+        "description": "A measure of how much the orbit deviates from a perfect circle."
+      },
+      "inclination_deg": {
+        "type": "number",
+        "description": "The orbital inclination in degrees relative to the ecliptic plane."
+      },
+      "argument_of_periapsis_deg": {
+        "type": "number",
+        "description": "The argument of periapsis (or perihelion) in degrees."
+      },
+      "longitude_of_ascending_node_deg": {
+        "type": "number",
+        "description": "The longitude of the ascending node in degrees."
+      },
+      "mean_anomaly_deg": {
+        "type": "number",
+        "description": "The mean anomaly at a specific epoch, in degrees."
+      },
+      "density_g_cm3": {
+        "type": "number",
+        "description": "The average density in grams per cubic centimeter."
+      },
+      "type": {
+        "type": "string",
+        "description": "The classification of the celestial body (e.g., 'planet', 'dwarf planet')."
+      }
+    },
+    "required": [
+      "name",
+      "satellites",
+      "radius_km",
+      "semi_major_axis_au",
+      "eccentricity",
+      "inclination_deg",
+      "argument_of_periapsis_deg",
+      "longitude_of_ascending_node_deg",
+      "mean_anomaly_deg",
+      "density_g_cm3",
+      "type"
+    ]
+  }
+}
