@@ -7,168 +7,288 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body { margin: 0; background-color: #0d0d0d; color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
-        #controls { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; pointer-events: none; }
+        #controls { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 8px; pointer-events: none; max-width: 300px;}
         h1 { margin: 0 0 5px 0; font-size: 1.2rem; color: #4DA6FF; }
-        p { margin: 0; font-size: 0.85rem; color: #ccc; }
-        canvas { display: block; }
+        p { margin: 0 0 10px 0; font-size: 0.85rem; color: #ccc; }
+        .hint { font-size: 0.75rem; color: #888; font-style: italic; }
+        canvas { display: block; cursor: crosshair; }
+        #selection-card { margin-top: 10px; border-top: 1px solid #333; padding-top: 10px; display: none; }
+        .data-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; }
+        .data-val { color: #fff; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div id="controls">
     <h1>Solar System Explorer</h1>
-    <p>Renderer: HTML5 Canvas (Fast)</p>
-    <p>Scroll to Zoom | Drag to Pan</p>
-    <p id="hover-info">Hover over an orbit...</p>
+    <p>Renderer: HTML5 Canvas</p>
+    <p class="hint">Scroll to Zoom | Drag to Pan<br><strong>Click a planet to animate it!</strong></p>
+    
+    <div id="selection-card">
+        <div class="data-row"><span>Name:</span> <span class="data-val" id="sel-name">-</span></div>
+        <div class="data-row"><span>SMA (a):</span> <span class="data-val" id="sel-a">-</span> AU</div>
+        <div class="data-row"><span>Eccentricity:</span> <span class="data-val" id="sel-e">-</span></div>
+        <div class="data-row"><span>Radius:</span> <span class="data-val" id="sel-r">-</span> km</div>
+    </div>
 </div>
 
 <canvas id="chart"></canvas>
 
 <script>
-    // 1. Setup Canvas
+    // --- 1. CONFIGURATION ---
+    const TIME_SPEED = 0.5; // How fast time passes
+    
+    // --- 2. SETUP CANVAS ---
     const canvas = d3.select("#chart");
     const context = canvas.node().getContext("2d");
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
+    let width = window.innerWidth;
+    let height = window.innerHeight;
     canvas.attr("width", width).attr("height", height);
 
-    // Global Zoom State
+    // Global State
     let transform = d3.zoomIdentity;
+    let selectedObject = null;
+    let planetsData = [];
 
-    // 2. Setup Scales (AU to Pixels)
-    const scaleX = d3.scaleLinear().domain([-6, 6]).range([0, width]);
-    // Store scale factor to calculate pixels per AU
-    const pixelsPerAU = width / 12; // width / (6 - -6)
+    // Resize handler
+    window.addEventListener('resize', () => {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.attr("width", width).attr("height", height);
+        if(planetsData.length) render();
+    });
 
-    // 3. Helper: Generate Orbit Points
-    function getOrbitPoints(a, e, steps = 150) {
+    // --- 3. PHYSICS & MATH HELPER FUNCTIONS ---
+
+    // Solve Kepler's Equation: M = E - e*sin(E)
+    // We calculate E (Eccentric Anomaly) from M (Mean Anomaly)
+    function solveKepler(M, e, tolerance = 1e-6) {
+        let E = M;
+        let delta = 1;
+        let iter = 0;
+        while (Math.abs(delta) > tolerance && iter < 100) {
+            delta = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+            E = E - delta;
+            iter++;
+        }
+        return E;
+    }
+
+    // Get (x,y) position for a planet based on its properties and Mean Anomaly (M)
+    function getPlanetPosition(d) {
+        // 1. Solve for Eccentric Anomaly (E)
+        const E = solveKepler(d.M, d.e);
+        
+        // 2. Calculate True Anomaly (nu)
+        // tan(nu/2) = sqrt((1+e)/(1-e)) * tan(E/2)
+        const sqrtTerm = Math.sqrt((1 + d.e) / (1 - d.e));
+        const tanNu2 = sqrtTerm * Math.tan(E / 2);
+        const nu = 2 * Math.atan(tanNu2);
+
+        // 3. Polar Equation using True Anomaly
+        const r = (d.a * (1 - d.e * d.e)) / (1 + d.e * Math.cos(nu));
+        
+        // 4. Convert to Cartesian (Standard orientation: Perihelion at 0 rad)
+        return {
+            x: r * Math.cos(nu),
+            y: r * Math.sin(nu)
+        };
+    }
+
+    // Pre-calculate full orbit path for static drawing
+    function getOrbitPath(a, e, steps = 150) {
         const points = [];
         for (let i = 0; i <= steps; i++) {
             const theta = (i / steps) * 2 * Math.PI;
             const r = (a * (1 - e * e)) / (1 + e * Math.cos(theta));
-            const x = r * Math.cos(theta);
-            const y = r * Math.sin(theta);
-            points.push([x, y]);
+            points.push([r * Math.cos(theta), r * Math.sin(theta)]);
         }
         return points;
     }
 
-    // 4. Main Render Function
-    function render(data) {
+    // --- 4. RENDER LOOP ---
+    
+    // Scales: Map AU to Pixels
+    const scaleX = d3.scaleLinear().domain([-6, 6]).range([0, width]);
+    // Base pixel scale factor (pixels per 1 AU)
+    const getPixelsPerAU = () => width / 12; 
+
+    function render() {
+        const pixelsPerAU = getPixelsPerAU();
+        
         // Clear Screen
         context.clearRect(0, 0, width, height);
         
         context.save();
-        // Apply Zoom/Pan Transforms
+        // Apply Zoom/Pan
         context.translate(transform.x, transform.y);
         context.scale(transform.k, transform.k);
         
-        // Define center offset (Sun position) based on our linear scale logic
-        // scaleX(0) gives the pixel x-coordinate of 0 AU (the Sun)
         const sunX = scaleX(0);
-        const sunY = height / 2; // vertical center since we didn't use a Y scale here for simplicity
+        const sunY = height / 2;
 
         // Draw Sun
         context.beginPath();
         context.arc(sunX, sunY, 5 / transform.k, 0, 2 * Math.PI);
         context.fillStyle = "#FFD700";
+        context.shadowBlur = 20;
+        context.shadowColor = "#FFD700";
         context.fill();
+        context.shadowBlur = 0; // Reset shadow
 
-        // Draw Orbits & Planets
-        data.forEach(d => {
-            // Draw Orbit Path
+        // Draw Planets
+        planetsData.forEach(d => {
+            const isSelected = (selectedObject === d);
+
+            // 1. Draw Orbit Path (Always visible, dimmed)
             context.beginPath();
-            d.orbitPoints.forEach((p, i) => {
-                // Manually map AU (p[0], p[1]) to Pixels relative to Sun
+            d.orbitPath.forEach((p, i) => {
                 const px = sunX + (p[0] * pixelsPerAU);
-                const py = sunY - (p[1] * pixelsPerAU); // Flip Y for screen coords
+                const py = sunY - (p[1] * pixelsPerAU);
                 if (i === 0) context.moveTo(px, py);
                 else context.lineTo(px, py);
             });
             context.closePath();
-            // Constant stroke width regardless of zoom
-            context.lineWidth = 1 / transform.k; 
-            context.strokeStyle = d.color || "#444";
+            context.lineWidth = isSelected ? (2 / transform.k) : (1 / transform.k); 
+            context.strokeStyle = isSelected ? (d.color || "#fff") : "#333";
             context.stroke();
 
-            // Draw Planet Marker (at arbitrary point or perihelion)
-            // Using the first point of the orbit for simplicity
-            const startP = d.orbitPoints[0];
-            const planetX = sunX + (startP[0] * pixelsPerAU);
-            const planetY = sunY - (startP[1] * pixelsPerAU);
+            // 2. Calculate Current Position
+            let pos;
+            if (isSelected) {
+                // If selected, calculate based on dynamic Mean Anomaly
+                pos = getPlanetPosition(d);
+            } else {
+                // If not selected, stay at "home" position (M=0, perihelion)
+                // or keep last known position? Let's reset to perihelion for neatness
+                pos = { x: d.a * (1 - d.e), y: 0 }; 
+                // OR: To freeze animation where it was, don't reset M. 
+                // For now, let's just calculate based on current M.
+                pos = getPlanetPosition(d);
+            }
 
+            const planetX = sunX + (pos.x * pixelsPerAU);
+            const planetY = sunY - (pos.y * pixelsPerAU);
+
+            // 3. Draw Planet Marker
             context.beginPath();
-            // Scale radius down so it doesn't get huge when zooming
-            context.arc(planetX, planetY, 3 / transform.k, 0, 2 * Math.PI);
-            context.fillStyle = d.color || "#444";
+            // Make selected planet slightly larger
+            const r = isSelected ? (6 / transform.k) : (3 / transform.k);
+            context.arc(planetX, planetY, r, 0, 2 * Math.PI);
+            context.fillStyle = d.color || "#666";
+            
+            // Add a glow if selected
+            if (isSelected) {
+                context.shadowBlur = 10;
+                context.shadowColor = d.color;
+            }
+            
             context.fill();
+            context.shadowBlur = 0;
         });
 
         context.restore();
+
+        // Continue Animation Loop
+        requestAnimationFrame(animate);
     }
 
-    // 5. Load Data & Initialize
+    function animate() {
+        if (selectedObject) {
+            // Update Mean Anomaly (M) for the selected object
+            // Speed depends on orbital period: n = k / a^1.5
+            // We use a simplified factor here
+            const meanMotion = TIME_SPEED / Math.pow(selectedObject.a, 1.5);
+            
+            selectedObject.M += meanMotion;
+            
+            // Wrap M to keep it within 0 to 2PI (optional, solveKepler handles large M fine)
+            if (selectedObject.M > 2 * Math.PI) selectedObject.M -= 2 * Math.PI;
+        }
+        render();
+    }
+
+    // --- 5. INITIALIZATION ---
     d3.json("solar_system_data.json").then(rawData => {
         // Filter & Sort
-        const data = rawData
+        planetsData = rawData
             .filter(d => d.a > 0 && d.e < 0.99)
-            .sort((a, b) => b.a - a.a);
+            .sort((a, b) => b.a - a.a); // Outer planets first
 
-        // Pre-calculate orbit points (Performance Optimization)
-        // We do this ONCE, not every frame.
-        data.forEach(d => {
-            d.orbitPoints = getOrbitPoints(d.a, d.e);
+        // Initialize Data properties
+        planetsData.forEach(d => {
+            d.orbitPath = getOrbitPath(d.a, d.e); // Pre-calc shape
+            d.M = 0; // Initial Mean Anomaly (Start at Perihelion)
         });
 
-        // Initial Draw
-        render(data);
+        // Start Loop
+        requestAnimationFrame(animate);
 
-        // Setup Zoom Behavior
+        // --- INTERACTION ---
+        
+        // ZOOM
         const zoom = d3.zoom()
-            .scaleExtent([0.1, 2000])
+            .scaleExtent([0.1, 5000])
             .on("zoom", (event) => {
                 transform = event.transform;
-                requestAnimationFrame(() => render(data));
             });
-
         canvas.call(zoom);
 
-        // Optional: Canvas Mouse Interaction (Tooltips)
-        // Calculating "closest object" on canvas is harder than SVG.
-        // For performance, we often skip tooltips or use a Quadtree.
-        // Simple hit detection:
-        d3.select("canvas").on("mousemove", (event) => {
+        // CLICK / TAP
+        canvas.on("click", (event) => {
+            // 1. Get Mouse Position relative to canvas
             const [mouseX, mouseY] = d3.pointer(event);
-            // Invert transform to get world coordinates
+            
+            // 2. Convert to "World" coordinates (AU)
+            // Reverse the zoom transform: (screen - translate) / scale
             const worldX = (mouseX - transform.x) / transform.k;
             const worldY = (mouseY - transform.y) / transform.k;
             
-            // Find object closest to mouse (Naive search, fast enough for 2k items)
+            const sunX = scaleX(0);
+            const sunY = height / 2;
+            const pixelsPerAU = getPixelsPerAU();
+
+            // 3. Find closest planet
             let closest = null;
             let minDist = Infinity;
-            
-            data.forEach(d => {
-                const startP = d.orbitPoints[0];
-                const px = scaleX(0) + (startP[0] * pixelsPerAU);
-                const py = (height / 2) - (startP[1] * pixelsPerAU);
-                
+            // Hit radius in pixels (adjusted for zoom level)
+            const hitRadius = 15 / transform.k; 
+
+            planetsData.forEach(d => {
+                // Get current planet screen position (in world pixels relative to origin)
+                const pos = getPlanetPosition(d);
+                const px = sunX + (pos.x * pixelsPerAU);
+                const py = sunY - (pos.y * pixelsPerAU);
+
+                // Distance from mouse click (in world pixels)
                 const dist = Math.hypot(px - worldX, py - worldY);
-                if (dist < (10 / transform.k) && dist < minDist) { // 10px hit radius
+                
+                if (dist < minDist) {
                     minDist = dist;
                     closest = d;
                 }
             });
 
-            const info = d3.select("#hover-info");
-            if (closest) {
-                info.html(`<strong>${closest.name}</strong><br>SMA: ${closest.a.toFixed(2)} AU`);
+            // 4. Select if within reasonable distance (or just select closest if user clicks)
+            // Let's use a generous threshold for usability
+            if (minDist < (20 / transform.k) + (closest.a * pixelsPerAU * 0.1)) {
+                selectedObject = closest;
+                updateInfoCard(closest);
             } else {
-                info.text("Hover over a planet...");
+                // Clicking empty space deselects? Optional.
+                // selectedObject = null;
             }
         });
-
     });
+
+    function updateInfoCard(d) {
+        d3.select("#selection-card").style("display", "block");
+        d3.select("#sel-name").text(d.name).style("color", d.color);
+        d3.select("#sel-a").text(d.a.toFixed(3));
+        d3.select("#sel-e").text(d.e.toFixed(3));
+        d3.select("#sel-r").text(d.radius_km);
+    }
+
 </script>
 </body>
 </html>
