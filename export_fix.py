@@ -12,57 +12,51 @@ color_map = {
 }
 
 print(f"Loading {input_file}...")
+# Use data_only=True so we get the calculated numbers, not formulas
 wb = openpyxl.load_workbook(input_file, data_only=True, keep_vba=False)
 ws = wb["Sorting Data"]
 
 data_list = []
 
-# Validating columns based on your specific file structure shift
-# Using index 3, 4, 5 based on the shift seen in your previous JSON
+# Iterate starting from row 2 to skip headers
 for row in ws.iter_rows(min_row=2, values_only=True):
-    name = row[0]
-    if not name: continue
+    # Based on the Screenshot analysis:
+    # row[0] = Symbol (Col A)
+    # row[1] = Name (Col B)
+    # row[2] = Sat # (Col C)
+    # row[3] = Radius (Col D)
+    # row[4] = SMA (Col E)
+    # row[5] = Eccentricity (Col F)
+    
+    # We grab the Name from index 1
+    name_val = row[1]
+    
+    if not name_val: 
+        continue
     
     try:
-        # Corrected Indices:
-        # Row[0]=Name, Row[1]=Sat#, Row[2]=SatCount/Blank?
-        # Based on the error, your data starts at index 3 for Radius
+        radius_val = row[3]  # Column D
+        sma_val = row[4]     # Column E
+        ecc_val = row[5]     # Column F
         
-        radius = row[2]  # Previously grabbed 0 (Sat Count) -> Move to row[2] if shifted?
-                         # Actually, let's map based on the 'shifted' values we saw:
-                         # The file seems to have a hidden column or offset.
-                         # We want the values that follow the name.
-        
-        # Let's hunt for the floats.
-        # usually: Name (str), Sat# (int), Radius (int), SMA (float), Ecc (float)
-        
-        # We grab explicit indices that align with "Radius, SMA, Ecc"
-        # Adjusted +1 from previous attempt
-        radius_val = row[2] 
-        sma_val = row[3]    
-        ecc_val = row[4]    
-
-        # Check if values look swapped and correct them
-        # If SMA is > 1000, it's probably Radius.
-        # This logic auto-fixes the shift if it occurs again.
-        if isinstance(sma_val, (int, float)) and sma_val > 500 and isinstance(radius_val, (int, float)) and radius_val < 500:
-             # It seems columns are Name, SatCount, Radius, SMA, Ecc
-             radius_val = row[2]
-             sma_val = row[3]
-             ecc_val = row[4]
-        
-        planet_obj = {
-            "name": str(name).strip(),
-            "radius_km": radius_val,
-            "a": float(sma_val), 
-            "e": float(ecc_val),
-            "color": color_map.get(str(name).strip(), "#888888")
-        }
-        data_list.append(planet_obj)
-    except:
+        # Ensure we have valid numbers
+        if isinstance(sma_val, (int, float)) and isinstance(ecc_val, (int, float)):
+            planet_obj = {
+                "name": str(name_val).strip(),
+                "radius_km": radius_val,
+                "a": float(sma_val), 
+                "e": float(ecc_val),
+                "color": color_map.get(str(name_val).strip(), "#888888")
+            }
+            data_list.append(planet_obj)
+    except IndexError:
+        # End of valid data
+        continue
+    except Exception as e:
+        print(f"Skipping row {name_val}: {e}")
         continue
 
 with open(output_file, 'w') as f:
     json.dump(data_list, f, indent=2)
 
-print(f"Fixed! Exported {len(data_list)} objects.")
+print(f"Fixed! Exported {len(data_list)} objects correctly.")
