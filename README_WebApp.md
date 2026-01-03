@@ -104,4 +104,4 @@ python export_fix.py
 * **Original Excel Project:** S. Bianchini (amorphose)
 * **Font:** Robert Winslow (Astromoony)
 * **Data Sources:** NASA JPL Small-Body Database, Mike Brown’s Dwarf Planet List.
-* **Web Port:** [Your Name/Username]
+* **Web Port:** A. Jukes III ([aj1126](https://github.com/aj1126))
