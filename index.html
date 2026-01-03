@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System D3 Explorer</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { margin: 0; background-color: #0d0d0d; color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        #controls { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; pointer-events: none; }
+        .label { pointer-events: none; text-anchor: middle; font-size: 10px; fill: #aaa; text-shadow: 0 0 3px #000; }
+        .orbit-path { fill: none; stroke-opacity: 0.4; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+        .sun { fill: #FFD700; filter: drop-shadow(0 0 10px #FFD700); }
+        h1 { margin: 0 0 5px 0; font-size: 1.2rem; color: #4DA6FF; }
+        p { margin: 0; font-size: 0.85rem; color: #ccc; }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <h1>Orbital Plotter</h1>
+    <p>Scroll to Zoom | Drag to Pan</p>
+    <p id="hover-info">Hover over an orbit...</p>
+</div>
+
+<div id="chart"></div>
+
+<script>
+    // 1. Setup SVG and Dimensions
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const svg = d3.select("#chart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .style("background", "#0d0d0d");
+
+    // Create a group for the plot content so we can zoom/pan it all together
+    const plotLayer = svg.append("g");
+
+    // 2. Setup Scales (AU to Pixels)
+    // Initial view: +/- 6 AU (Jupiter is at 5.2)
+    const scaleX = d3.scaleLinear().domain([-6, 6]).range([0, width]);
+    const scaleY = d3.scaleLinear().domain([-6, 6]).range([height, 0]);
+
+    // 3. Zoom Behavior
+    const zoom = d3.zoom()
+        .scaleExtent([0.1, 1000]) // Allow zooming out to Kuiper Belt and in to Mercury
+        .on("zoom", (event) => {
+            plotLayer.attr("transform", event.transform);
+            // Keep lines thin when zoomed in
+            plotLayer.selectAll(".orbit-path").attr("stroke-width", 1.5 / event.transform.k);
+            plotLayer.selectAll(".planet-circle").attr("r", d => 4 / event.transform.k);
+            plotLayer.select(".sun").attr("r", 5 / event.transform.k);
+            plotLayer.selectAll(".label").style("font-size", (10 / event.transform.k) + "px");
+        });
+
+    svg.call(zoom);
+
+    // 4. Helper: Generate Ellipse Path Points
+    // r = a(1 - e^2) / (1 + e cos(theta))
+    function getOrbitPoints(a, e, steps = 200) {
+        const points = [];
+        for (let i = 0; i <= steps; i++) {
+            const theta = (i / steps) * 2 * Math.PI;
+            const r = (a * (1 - e * e)) / (1 + e * Math.cos(theta));
+            
+            // Convert Polar to Cartesian
+            // Note: The Sun is at one focus (0,0).
+            const x = r * Math.cos(theta);
+            const y = r * Math.sin(theta);
+            points.push([x, y]);
+        }
+        return points;
+    }
+
+    // 5. Load Data
+    d3.json("solar_system_data.json").then(data => {
+        
+        // Filter out bad data (e.g. radius=0 artifacts) and limit to reasonable objects first
+        // Or render everything. Let's render everything with a valid SMA > 0.
+        const objects = data.filter(d => d.a > 0 && d.e < 0.99); // Exclude parabolic comets for now
+
+        // Sort by Semi-Major Axis so outer planets are behind inner ones (though fill is none)
+        objects.sort((a, b) => b.a - a.a);
+
+        // Draw Sun
+        plotLayer.append("circle")
+            .attr("class", "sun")
+            .attr("cx", scaleX(0))
+            .attr("cy", scaleY(0))
+            .attr("r", 5);
+
+        // Draw Orbits
+        objects.forEach(obj => {
+            const points = getOrbitPoints(obj.a, obj.e);
+
+            // Line generator adapted for our scale
+            const lineGen = d3.line()
+                .x(p => scaleX(p[0]))
+                .y(p => scaleY(p[1]));
+
+            // Append Path
+            plotLayer.append("path")
+                .datum(obj)
+                .attr("class", "orbit-path")
+                .attr("d", lineGen(points))
+                .attr("stroke", obj.color || "#555")
+                .on("mouseover", function(event, d) {
+                    d3.select(this).attr("stroke", "#fff").attr("stroke-opacity", 1);
+                    d3.select("#hover-info").html(
+                        `<strong>${d.name}</strong><br>
+                         SMA: ${d.a.toFixed(2)} AU<br>
+                         Eccentricity: ${d.e.toFixed(3)}`
+                    );
+                })
+                .on("mouseout", function(event, d) {
+                    d3.select(this).attr("stroke", d.color || "#555").attr("stroke-opacity", 0.4);
+                    d3.select("#hover-info").text("Hover over an orbit...");
+                });
+
+            // Draw Planet Marker (at Perihelion - starting point)
+            // You can randomize the angle 'theta' here to scatter them
+            const theta = Math.random() * 2 * Math.PI; 
+            const r = (obj.a * (1 - obj.e * obj.e)) / (1 + obj.e * Math.cos(theta));
+            const x = r * Math.cos(theta);
+            const y = r * Math.sin(theta);
+
+            plotLayer.append("circle")
+                .attr("class", "planet-circle")
+                .attr("cx", scaleX(x))
+                .attr("cy", scaleY(y))
+                .attr("r", 4)
+                .attr("fill", obj.color || "#555");
+        });
+
+    }).catch(err => {
+        console.error("Error loading JSON:", err);
+        d3.select("#hover-info").text("Error loading data. Check console (F12).");
+    });
+
+</script>
+</body>
+</html>
