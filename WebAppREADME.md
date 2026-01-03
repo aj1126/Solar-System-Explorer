@@ -26,8 +26,7 @@ V. [Credits & Version History](#v-credits--version-history)
 
 2. **Download the files**  
    - Go to the [Releases page](https://github.com/amorphose/Solar-System-Explorer/releases) and download the latest version of *Solar System Explorer*.  
-   - You can download the workbook directly (`.xlsm`) or use the “Source code (zip)” which also includes this README and LICENSE.  
-   - The required font, [Astromoony](https://github.com/RobertWinslow/Astromoony-Font), must be downloaded separately.  
+
 
 3. **Unblock the file to allow macros**  
    - Right-click on *Solar System Explorer`.xlsm`* and choose **Properties**.  
