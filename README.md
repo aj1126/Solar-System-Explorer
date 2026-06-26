@@ -1,8 +1,7 @@
 # Solar System Explorer
 
 *An Interactive Excel Workbook for Exploring the Solar System*  
-**Project Version 1.2.0 — September 25, 2025**
-**Source Version 1.1.0 — September 25, 2025**
+**Version 1.4 — October 14, 2025**
 
 ---
 
@@ -16,19 +15,22 @@ Inclusion standards for the workbook are as follows:
 - All known natural satellites  
 - Major NEOs, plus those visited by spacecraft  
 - Asteroids, Centaurs, and Jupiter Trojans ≥ 50 km radius  
-- All known Trojan asteroids of the other planets  
+- Select Trojan asteroids of the other planets  
 - KBOs, SDOs, and detached objects ≥ 100 km radius  
-- Select asteroids and TNOs visited by spacecraft  
+- Select asteroids and TNOs visited by spacecraft
+- Great Comets since the year 1990, plus those visited by spacecraft `NEW`
+- All known Interstellar objects `NEW`
 
 ---
 
 ## Contents
 
-I. [Installation / Setup](#i-installation--setup)  
+I. [Installation / Setup - Excel VBA Macros](#i-installation--setup)  
 II. [Macros & Features](#ii-macros--features)  
 III. [Using the Workbook](#iii-using-the-workbook)  
 IV. [Known Limitations / Notes](#iv-known-limitations--notes)  
 V. [Credits & Version History](#v-credits--version-history)  
+VI. [Installation / Setup - python web app](README_WebApp.md)  
 
 ---
 
@@ -145,10 +147,11 @@ The workbook contains four main sheets:
   - [Wikipedia](https://www.wikipedia.org/)  
 - Assisted with VBA coding/troubleshooting by ChatGPT-5 (OpenAI).  
 
-#### Changelog (Version History)
-**[Changelog](CHANGELOG.md)**
-
-
+**Version History**
+- **1.4 — October 14, 2025**
+  - Added an external links column for quick access to an object's Wikipedia page
+  - Includes 1,702 catalogued objects `(+2)`
+- See **[Changelog](CHANGELOG.md)** for full version history
 
 ---
 

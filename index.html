@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System D3 Canvas</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { margin: 0; background-color: #0d0d0d; color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        
+        /* Updated Control Panel Styles */
+        #controls { 
+            position: absolute; top: 10px; left: 10px; 
+            background: rgba(0,0,0,0.85); 
+            padding: 15px; 
+            border-radius: 8px; 
+            border: 1px solid #333;
+            max-width: 300px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        h1 { margin: 0 0 5px 0; font-size: 1.2rem; color: #4DA6FF; }
+        p { margin: 0 0 10px 0; font-size: 0.85rem; color: #ccc; }
+        .hint { font-size: 0.75rem; color: #888; font-style: italic; margin-bottom: 15px; display: block; }
+        
+        /* UI Elements */
+        .control-group { margin-bottom: 12px; }
+        label { font-size: 0.8rem; font-weight: bold; color: #eee; display: flex; justify-content: space-between; }
+        input[type=range] { width: 100%; margin-top: 5px; cursor: pointer; }
+        
+        button#restart-btn {
+            width: 100%;
+            padding: 8px;
+            background-color: #333;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background 0.2s;
+        }
+        button#restart-btn:hover { background-color: #4DA6FF; border-color: #4DA6FF; }
+        button#restart-btn:active { background-color: #2a85db; }
+
+        /* Selection Card */
+        #selection-card { margin-top: 15px; border-top: 1px solid #444; padding-top: 10px; display: none; }
+        .data-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; }
+        .data-val { color: #fff; font-weight: bold; }
+
+        canvas { display: block; cursor: crosshair; }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <h1>Solar System Explorer</h1>
+    <span class="hint">Scroll to Zoom | Drag to Pan<br>Click a planet to animate it!</span>
+
+    <div class="control-group">
+        <label for="speed-slider">Speed: <span id="speed-val">0.05</span>x</label>
+        <input type="range" id="speed-slider" min="0.05" max="2" step="0.05" value="0.05">
+    </div>
+
+    <button id="restart-btn">↺ Restart Animation</button>
+    
+    <div id="selection-card">
+        <div class="data-row"><span>Name:</span> <span class="data-val" id="sel-name">-</span></div>
+        <div class="data-row"><span>SMA (a):</span> <span class="data-val" id="sel-a">-</span> AU</div>
+        <div class="data-row"><span>Eccentricity:</span> <span class="data-val" id="sel-e">-</span></div>
+        <div class="data-row"><span>Radius:</span> <span class="data-val" id="sel-r">-</span> km</div>
+    </div>
+</div>
+
+<canvas id="chart"></canvas>
+
+<script>
+    // --- 1. CONFIGURATION ---
+    // Start at 0.05 to match the slider's default value
+    let timeSpeed = 0.05; 
+    
+    // --- 2. SETUP CANVAS ---
+    const canvas = d3.select("#chart");
+    const context = canvas.node().getContext("2d");
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    canvas.attr("width", width).attr("height", height);
+
+    // Global State
+    let transform = d3.zoomIdentity;
+    let selectedObject = null;
+    let planetsData = [];
+
+    // Resize handler
+    window.addEventListener('resize', () => {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.attr("width", width).attr("height", height);
+        if(planetsData.length) render();
+    });
+
+    // --- 3. PHYSICS & MATH HELPER FUNCTIONS ---
+
+    function solveKepler(M, e, tolerance = 1e-6) {
+        let E = M;
+        let delta = 1;
+        let iter = 0;
+        while (Math.abs(delta) > tolerance && iter < 100) {
+            delta = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+            E = E - delta;
+            iter++;
+        }
+        return E;
+    }
+
+    function getPlanetPosition(d) {
+        const E = solveKepler(d.M, d.e);
+        const sqrtTerm = Math.sqrt((1 + d.e) / (1 - d.e));
+        const tanNu2 = sqrtTerm * Math.tan(E / 2);
+        const nu = 2 * Math.atan(tanNu2);
+        const r = (d.a * (1 - d.e * d.e)) / (1 + d.e * Math.cos(nu));
+        return {
+            x: r * Math.cos(nu),
+            y: r * Math.sin(nu)
+        };
+    }
+
+    function getOrbitPath(a, e, steps = 150) {
+        const points = [];
+        for (let i = 0; i <= steps; i++) {
+            const theta = (i / steps) * 2 * Math.PI;
+            const r = (a * (1 - e * e)) / (1 + e * Math.cos(theta));
+            points.push([r * Math.cos(theta), r * Math.sin(theta)]);
+        }
+        return points;
+    }
+
+    // --- 4. RENDER LOOP ---
+    
+    const scaleX = d3.scaleLinear().domain([-6, 6]).range([0, width]);
+    const getPixelsPerAU = () => width / 12; 
+
+    function render() {
+        const pixelsPerAU = getPixelsPerAU();
+        
+        context.clearRect(0, 0, width, height);
+        
+        context.save();
+        context.translate(transform.x, transform.y);
+        context.scale(transform.k, transform.k);
+        
+        const sunX = scaleX(0);
+        const sunY = height / 2;
+
+        // Draw Sun
+        context.beginPath();
+        context.arc(sunX, sunY, 5 / transform.k, 0, 2 * Math.PI);
+        context.fillStyle = "#FFD700";
+        context.shadowBlur = 20;
+        context.shadowColor = "#FFD700";
+        context.fill();
+        context.shadowBlur = 0;
+
+        // Draw Planets
+        planetsData.forEach(d => {
+            const isSelected = (selectedObject === d);
+
+            // Path
+            context.beginPath();
+            d.orbitPath.forEach((p, i) => {
+                const px = sunX + (p[0] * pixelsPerAU);
+                const py = sunY - (p[1] * pixelsPerAU);
+                if (i === 0) context.moveTo(px, py);
+                else context.lineTo(px, py);
+            });
+            context.closePath();
+            context.lineWidth = isSelected ? (2 / transform.k) : (1 / transform.k); 
+            context.strokeStyle = isSelected ? (d.color || "#fff") : "#333";
+            context.stroke();
+
+            // Position
+            let pos = getPlanetPosition(d); // Always calc position based on current M
+            const planetX = sunX + (pos.x * pixelsPerAU);
+            const planetY = sunY - (pos.y * pixelsPerAU);
+
+            // Marker
+            context.beginPath();
+            const r = isSelected ? (6 / transform.k) : (3 / transform.k);
+            context.arc(planetX, planetY, r, 0, 2 * Math.PI);
+            context.fillStyle = d.color || "#666";
+            
+            if (isSelected) {
+                context.shadowBlur = 10;
+                context.shadowColor = d.color;
+            }
+            
+            context.fill();
+            context.shadowBlur = 0;
+        });
+
+        context.restore();
+
+        requestAnimationFrame(animate);
+    }
+
+    function animate() {
+        if (selectedObject) {
+            // Use the dynamic timeSpeed variable here
+            const meanMotion = timeSpeed / Math.pow(selectedObject.a, 1.5);
+            selectedObject.M += meanMotion;
+            if (selectedObject.M > 2 * Math.PI) selectedObject.M -= 2 * Math.PI;
+        }
+        render();
+    }
+
+    // --- 5. INITIALIZATION & EVENTS ---
+    
+    // Slider Logic
+    d3.select("#speed-slider").on("input", function() {
+        timeSpeed = +this.value; // Update global speed
+        d3.select("#speed-val").text(timeSpeed.toFixed(2));
+    });
+
+    // Restart Button Logic
+    d3.select("#restart-btn").on("click", function() {
+        // Reset Mean Anomaly (M) for ALL planets so they return to start
+        planetsData.forEach(d => d.M = 0);
+    });
+
+    d3.json("solar_system_data.json").then(rawData => {
+        planetsData = rawData
+            .filter(d => d.a > 0 && d.e < 0.99)
+            .sort((a, b) => b.a - a.a);
+
+        planetsData.forEach(d => {
+            d.orbitPath = getOrbitPath(d.a, d.e); 
+            d.M = 0; 
+        });
+
+        requestAnimationFrame(animate);
+
+        // Zoom
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 5000])
+            .on("zoom", (event) => {
+                transform = event.transform;
+            });
+        canvas.call(zoom);
+
+        // Click Selection
+        canvas.on("click", (event) => {
+            const [mouseX, mouseY] = d3.pointer(event);
+            const worldX = (mouseX - transform.x) / transform.k;
+            const worldY = (mouseY - transform.y) / transform.k;
+            
+            const sunX = scaleX(0);
+            const sunY = height / 2;
+            const pixelsPerAU = getPixelsPerAU();
+
+            let closest = null;
+            let minDist = Infinity;
+
+            planetsData.forEach(d => {
+                const pos = getPlanetPosition(d);
+                const px = sunX + (pos.x * pixelsPerAU);
+                const py = sunY - (pos.y * pixelsPerAU);
+                const dist = Math.hypot(px - worldX, py - worldY);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = d;
+                }
+            });
+
+            if (minDist < (20 / transform.k) + (closest.a * pixelsPerAU * 0.1)) {
+                selectedObject = closest;
+                updateInfoCard(closest);
+            }
+        });
+    });
+
+    function updateInfoCard(d) {
+        d3.select("#selection-card").style("display", "block");
+        d3.select("#sel-name").text(d.name).style("color", d.color);
+        d3.select("#sel-a").text(d.a.toFixed(3));
+        d3.select("#sel-e").text(d.e.toFixed(3));
+        d3.select("#sel-r").text(d.radius_km);
+    }
+
+</script>
+</body>
+</html>
